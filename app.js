@@ -1,4 +1,5 @@
-const BUILD = "VS-005";
+const BUILD = "VS-006";
+const SAMPLE_SIZE = 96;
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const valueField = document.querySelector("#valueField");
@@ -9,7 +10,11 @@ const cameraLayer = document.querySelector("#cameraLayer");
 const video = document.querySelector("#camera");
 const freezeCanvas = document.querySelector("#freezeCanvas");
 const freezeContext = freezeCanvas.getContext("2d");
+const sampleCanvas = document.querySelector("#sampleCanvas");
+const sampleContext = sampleCanvas.getContext("2d", { willReadFrequently: true });
 const selectedBadge = document.querySelector("#selectedBadge strong");
+const badgeLabel = document.querySelector("#badgeLabel");
+const meanReading = document.querySelector("#meanReading");
 const cameraStatus = document.querySelector("#cameraStatus");
 const standardModeButton = document.querySelector("#standardMode");
 const munsellModeButton = document.querySelector("#munsellMode");
@@ -18,6 +23,7 @@ const cameraModeLabel = document.querySelector("#cameraModeLabel");
 const apertureSizeInput = document.querySelector("#apertureSize");
 const freezeButton = document.querySelector("#freezeButton");
 const freezeLabel = document.querySelector("#freezeLabel");
+const autoMatchButton = document.querySelector("#autoMatchButton");
 const scaleNote = document.querySelector("#scaleNote");
 
 let selectedValue = 5;
@@ -25,6 +31,7 @@ let scaleMode = "standard";
 let cameraMode = "colour";
 let stream;
 let frozen = false;
+let autoMatchActive = false;
 let wheelAccumulator = 0;
 let wheelResetTimer;
 const dragState = {
@@ -59,6 +66,11 @@ function munsellReflectance(value) {
 function linearToSrgb(value) {
   if (value <= 0.0031308) return 12.92 * value;
   return (1.055 * (value ** (1 / 2.4))) - 0.055;
+}
+
+function srgbToLinear(value) {
+  if (value <= 0.04045) return value / 12.92;
+  return ((value + 0.055) / 1.055) ** 2.4;
 }
 
 function munsellGrey(value) {
@@ -166,7 +178,15 @@ function updateBandLayout() {
   });
 }
 
-function selectValue(value) {
+function clearAutoResult() {
+  if (!autoMatchActive) return;
+  autoMatchActive = false;
+  badgeLabel.textContent = "Selected";
+  meanReading.hidden = true;
+}
+
+function selectValue(value, { preserveMean = false } = {}) {
+  if (!preserveMean) clearAutoResult();
   selectedValue = value;
   selectedBadge.textContent = `${scaleMode === "munsell" ? "N" : ""}${value}`;
   updateBandLayout();
@@ -174,6 +194,7 @@ function selectValue(value) {
 }
 
 function setScaleMode(mode) {
+  clearAutoResult();
   scaleMode = mode;
   standardModeButton.classList.toggle("active", mode === "standard");
   munsellModeButton.classList.toggle("active", mode === "munsell");
@@ -221,25 +242,126 @@ function toggleCameraMode() {
   cameraModeLabel.textContent = cameraMode === "colour" ? "Colour" : "B&W";
 }
 
+function freezeCurrentFrame() {
+  if (!video.videoWidth) return;
+  freezeCanvas.width = video.videoWidth;
+  freezeCanvas.height = video.videoHeight;
+  freezeContext.drawImage(video, 0, 0);
+  freezeCanvas.classList.add("visible");
+  freezeLabel.textContent = "Resume";
+  frozen = true;
+  setCameraStatus("Frame frozen");
+  return true;
+}
+
 function toggleFreeze() {
   if (!video.videoWidth) return;
-  frozen = !frozen;
-
   if (frozen) {
-    freezeCanvas.width = video.videoWidth;
-    freezeCanvas.height = video.videoHeight;
-    freezeContext.drawImage(video, 0, 0);
-    freezeCanvas.classList.add("visible");
-    freezeLabel.textContent = "Resume";
-    setCameraStatus("Frame frozen");
-  } else {
+    frozen = false;
     freezeCanvas.classList.remove("visible");
     freezeLabel.textContent = "Freeze";
     setCameraStatus("Rear camera · Live");
+    clearAutoResult();
+  } else {
+    freezeCurrentFrame();
   }
 }
 
+function munsellValueForReflectance(reflectance) {
+  let low = 0;
+  let high = 10;
+  for (let iteration = 0; iteration < 32; iteration += 1) {
+    const midpoint = (low + high) / 2;
+    if (munsellReflectance(midpoint) < reflectance) {
+      low = midpoint;
+    } else {
+      high = midpoint;
+    }
+  }
+  return (low + high) / 2;
+}
+
+function readMeanApertureLuminance() {
+  if (!video.videoWidth || !freezeCanvas.width) return null;
+
+  const layerRect = cameraLayer.getBoundingClientRect();
+  const apertureRect = aperture.getBoundingClientRect();
+  const sourceWidth = freezeCanvas.width;
+  const sourceHeight = freezeCanvas.height;
+  const scale = Math.max(
+    layerRect.width / sourceWidth,
+    layerRect.height / sourceHeight
+  );
+  const renderedWidth = sourceWidth * scale;
+  const renderedHeight = sourceHeight * scale;
+  const cropX = (renderedWidth - layerRect.width) / 2;
+  const cropY = (renderedHeight - layerRect.height) / 2;
+  const centreX = apertureRect.left + (apertureRect.width / 2) - layerRect.left;
+  const centreY = apertureRect.top + (apertureRect.height / 2) - layerRect.top;
+  const sourceDiameter = apertureRect.width / scale;
+  const sourceX = ((centreX + cropX) / scale) - (sourceDiameter / 2);
+  const sourceY = ((centreY + cropY) / scale) - (sourceDiameter / 2);
+
+  sampleContext.drawImage(
+    freezeCanvas,
+    sourceX,
+    sourceY,
+    sourceDiameter,
+    sourceDiameter,
+    0,
+    0,
+    SAMPLE_SIZE,
+    SAMPLE_SIZE
+  );
+
+  const pixels = sampleContext.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data;
+  const centre = SAMPLE_SIZE / 2;
+  const radiusSquared = ((SAMPLE_SIZE / 2) - 1) ** 2;
+  let luminanceTotal = 0;
+  let pixelCount = 0;
+
+  for (let y = 0; y < SAMPLE_SIZE; y += 1) {
+    for (let x = 0; x < SAMPLE_SIZE; x += 1) {
+      const offsetX = x + 0.5 - centre;
+      const offsetY = y + 0.5 - centre;
+      if ((offsetX ** 2) + (offsetY ** 2) > radiusSquared) continue;
+
+      const index = ((y * SAMPLE_SIZE) + x) * 4;
+      const red = srgbToLinear(pixels[index] / 255);
+      const green = srgbToLinear(pixels[index + 1] / 255);
+      const blue = srgbToLinear(pixels[index + 2] / 255);
+      luminanceTotal += (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+      pixelCount += 1;
+    }
+  }
+
+  return pixelCount ? luminanceTotal / pixelCount : null;
+}
+
+function autoMatch() {
+  if (!video.videoWidth) return;
+  if (!frozen && !freezeCurrentFrame()) return;
+
+  const meanLuminance = readMeanApertureLuminance();
+  if (meanLuminance === null) return;
+
+  const continuousValue = scaleMode === "munsell"
+    ? munsellValueForReflectance(meanLuminance)
+    : 1 + (linearToSrgb(meanLuminance) * 9);
+  const meanValue = Math.max(1, Math.min(10, continuousValue));
+  const nearestValue = Math.max(1, Math.min(10, Math.round(meanValue)));
+
+  autoMatchActive = true;
+  selectValue(nearestValue, { preserveMean: true });
+  badgeLabel.textContent = "Matched";
+  meanReading.textContent = `Mean ${scaleMode === "munsell" ? "N" : ""}${meanValue.toFixed(2)}`;
+  meanReading.hidden = false;
+  setCameraStatus("Auto matched · Frozen");
+  navigator.vibrate?.([10, 35, 10]);
+}
+
 function updateApertureSize() {
+  clearAutoResult();
   document.documentElement.style.setProperty("--aperture-size", `${apertureSizeInput.value}px`);
   document.documentElement.style.setProperty("--aperture-radius", `${apertureSizeInput.value / 2}px`);
   updateBandLayout();
@@ -323,6 +445,7 @@ standardModeButton.addEventListener("click", () => setScaleMode("standard"));
 munsellModeButton.addEventListener("click", () => setScaleMode("munsell"));
 cameraModeButton.addEventListener("click", toggleCameraMode);
 freezeButton.addEventListener("click", toggleFreeze);
+autoMatchButton.addEventListener("click", autoMatch);
 apertureSizeInput.addEventListener("input", updateApertureSize);
 valueField.addEventListener("pointerdown", beginScaleDrag);
 valueField.addEventListener("pointermove", moveScaleDrag);

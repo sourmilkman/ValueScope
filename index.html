@@ -43,8 +43,9 @@
     </section>
 
     <div id="selectedBadge" class="selected-badge" aria-live="polite">
-      <small>Selected</small>
+      <small id="badgeLabel">Selected</small>
       <strong>5</strong>
+      <span id="meanReading" class="mean-reading" hidden>Mean 5.00</span>
     </div>
 
     <section class="control-dock" aria-label="Camera controls">
@@ -62,15 +63,21 @@
         <span class="button-icon freeze-icon" aria-hidden="true"></span>
         <span id="freezeLabel">Freeze</span>
       </button>
+
+      <button id="autoMatchButton" class="dock-button auto-match" type="button">
+        <span class="button-icon auto-icon" aria-hidden="true"></span>
+        <span>Auto match</span>
+      </button>
     </section>
 
     <footer>
       <span id="scaleNote">Even digital steps</span>
       <span>Tap or slide a value</span>
-      <span class="build-label">VS-005</span>
+      <span class="build-label">VS-006</span>
     </footer>
   </main>
 
+  <canvas id="sampleCanvas" width="96" height="96" hidden></canvas>
   <script src="./app.js" defer></script>
 </body>
 </html>
