@@ -1,48 +1,154 @@
-const BUILD = "VS-001";
-const SAMPLE_SIZE = 64;
+const BUILD = "VS-002";
+const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
+const valueField = document.querySelector("#valueField");
+const comparisonField = document.querySelector("#comparisonField");
+const comparisonLabel = document.querySelector("#comparisonLabel");
+const aperture = document.querySelector("#aperture");
 const video = document.querySelector("#camera");
 const freezeCanvas = document.querySelector("#freezeCanvas");
-const sampleCanvas = document.querySelector("#sampleCanvas");
-const sampleContext = sampleCanvas.getContext("2d", { willReadFrequently: true });
 const freezeContext = freezeCanvas.getContext("2d");
-const aperture = document.querySelector("#aperture");
-const valueScale = document.querySelector("#valueScale");
-const valueNumber = document.querySelector("#valueNumber");
-const currentSwatch = document.querySelector("#currentSwatch");
-const luminancePercent = document.querySelector("#luminancePercent");
-const matchStatus = document.querySelector("#matchStatus");
+const selectedBadge = document.querySelector("#selectedBadge strong");
 const cameraStatus = document.querySelector("#cameraStatus");
-const calibrationStatus = document.querySelector("#calibrationStatus");
+const standardModeButton = document.querySelector("#standardMode");
+const munsellModeButton = document.querySelector("#munsellMode");
+const cameraModeButton = document.querySelector("#cameraModeButton");
+const cameraModeLabel = document.querySelector("#cameraModeLabel");
+const apertureSizeInput = document.querySelector("#apertureSize");
 const freezeButton = document.querySelector("#freezeButton");
-const targetButton = document.querySelector("#targetButton");
-const whiteButton = document.querySelector("#whiteButton");
-const blackButton = document.querySelector("#blackButton");
+const freezeLabel = document.querySelector("#freezeLabel");
+const scaleNote = document.querySelector("#scaleNote");
 
+let selectedValue = 5;
+let scaleMode = "standard";
+let cameraMode = "colour";
 let stream;
 let frozen = false;
-let currentRawLuminance = null;
-let currentValue = null;
-let targetValue = null;
-let whitePoint = 255;
-let blackPoint = 0;
-let lastUpdate = 0;
 
-function greyForValue(value) {
-  return Math.round(255 - ((value - 1) / 9) * 255);
+function clampChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
 }
 
-function buildScale() {
-  for (let value = 1; value <= 10; value += 1) {
-    const grey = greyForValue(value);
-    const step = document.createElement("span");
-    step.className = "scale-step";
-    step.dataset.value = value;
-    step.textContent = value;
-    step.style.setProperty("--step-color", `rgb(${grey} ${grey} ${grey})`);
-    step.style.setProperty("--step-text", grey > 132 ? "#101114" : "#f6f6f3");
-    valueScale.append(step);
-  }
+function standardGrey(value) {
+  const channel = ((value - 1) / 9) * 255;
+  return [channel, channel, channel].map(clampChannel);
+}
+
+function munsellReflectance(value) {
+  const polynomial = (munsellValue) =>
+    (1.2219 * munsellValue) -
+    (0.23111 * (munsellValue ** 2)) +
+    (0.23951 * (munsellValue ** 3)) -
+    (0.021009 * (munsellValue ** 4)) +
+    (0.0008404 * (munsellValue ** 5));
+  const normalized = polynomial(value) / polynomial(10);
+  return Math.max(0, Math.min(1, normalized));
+}
+
+function linearToSrgb(value) {
+  if (value <= 0.0031308) return 12.92 * value;
+  return (1.055 * (value ** (1 / 2.4))) - 0.055;
+}
+
+function munsellGrey(value) {
+  const luminance = munsellReflectance(value);
+  const neutralChannel = clampChannel(linearToSrgb(luminance) * 255);
+  return [neutralChannel, neutralChannel, neutralChannel];
+}
+
+function colourForValue(value) {
+  return scaleMode === "munsell" ? munsellGrey(value) : standardGrey(value);
+}
+
+function labelColour([red, green, blue]) {
+  const luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+  return luminance > 138 ? ["#111210", "rgba(255,255,255,.42)"] : ["#f7f7f2", "rgba(0,0,0,.5)"];
+}
+
+function renderScale() {
+  valueField.replaceChildren();
+
+  VALUES.forEach((value) => {
+    const colour = colourForValue(value);
+    const [textColour, shadowColour] = labelColour(colour);
+    const band = document.createElement("button");
+    band.type = "button";
+    band.className = "value-band";
+    band.dataset.value = value;
+    band.setAttribute("aria-label", `Select ${scaleMode === "munsell" ? "Munsell N" : "value "}${value}`);
+    band.style.setProperty("--band-colour", `rgb(${colour.join(" ")})`);
+    band.style.setProperty("--label-colour", textColour);
+    band.style.setProperty("--label-shadow", shadowColour);
+    band.innerHTML = `
+      <span class="value-label">
+        <small>Selected</small>
+        <strong>${scaleMode === "munsell" ? "N" : ""}${value}</strong>
+      </span>
+    `;
+    band.addEventListener("click", () => selectValue(value));
+    valueField.append(band);
+  });
+
+  updateBandLayout();
+  updateComparisonField();
+}
+
+function updateComparisonField() {
+  const colour = colourForValue(selectedValue);
+  const [textColour, shadowColour] = labelColour(colour);
+  comparisonField.style.setProperty("--comparison-colour", `rgb(${colour.join(" ")})`);
+  comparisonField.style.setProperty("--comparison-label", textColour);
+  comparisonField.style.setProperty("--comparison-shadow", shadowColour);
+  comparisonLabel.textContent = `${scaleMode === "munsell" ? "N" : ""}${selectedValue}`;
+}
+
+function updateBandLayout() {
+  const bands = [...document.querySelectorAll(".value-band")];
+  const viewportHeight = valueField.clientHeight;
+  const apertureSize = Number(apertureSizeInput.value);
+  const centralHeight = Math.min(viewportHeight * 0.42, apertureSize + 44);
+  const halfRemainder = (viewportHeight - centralHeight) / 2;
+  const topCount = selectedValue - 1;
+  const bottomCount = 10 - selectedValue;
+  const topHeight = topCount ? halfRemainder / topCount : 0;
+  const bottomHeight = bottomCount ? halfRemainder / bottomCount : 0;
+
+  bands.forEach((band) => {
+    const value = Number(band.dataset.value);
+    let height;
+
+    if (value < selectedValue) {
+      height = topHeight;
+    } else if (value > selectedValue) {
+      height = bottomHeight;
+    } else {
+      height = centralHeight;
+      if (!topCount) height += halfRemainder;
+      if (!bottomCount) height += halfRemainder;
+    }
+
+    band.style.height = `${height}px`;
+    band.classList.toggle("selected", value === selectedValue);
+    band.classList.toggle("compact", height < 34);
+  });
+}
+
+function selectValue(value) {
+  selectedValue = value;
+  selectedBadge.textContent = `${scaleMode === "munsell" ? "N" : ""}${value}`;
+  updateBandLayout();
+  updateComparisonField();
+}
+
+function setScaleMode(mode) {
+  scaleMode = mode;
+  standardModeButton.classList.toggle("active", mode === "standard");
+  munsellModeButton.classList.toggle("active", mode === "munsell");
+  scaleNote.textContent = mode === "munsell"
+    ? "Munsell reflectance steps"
+    : "Even digital steps";
+  renderScale();
+  selectedBadge.textContent = `${mode === "munsell" ? "N" : ""}${selectedValue}`;
 }
 
 function setCameraStatus(message, isError = false) {
@@ -57,6 +163,7 @@ async function startCamera() {
   }
 
   try {
+    stream?.getTracks().forEach((track) => track.stop());
     stream = await navigator.mediaDevices.getUserMedia({
       audio: false,
       video: {
@@ -68,7 +175,6 @@ async function startCamera() {
     video.srcObject = stream;
     await video.play();
     setCameraStatus("Rear camera · Live");
-    requestAnimationFrame(sampleLoop);
   } catch (error) {
     console.error(error);
     setCameraStatus("Tap to allow camera", true);
@@ -76,120 +182,10 @@ async function startCamera() {
   }
 }
 
-function getSourceAperture() {
-  const videoRect = video.getBoundingClientRect();
-  const apertureRect = aperture.getBoundingClientRect();
-  const scale = Math.max(
-    videoRect.width / video.videoWidth,
-    videoRect.height / video.videoHeight
-  );
-  const displayedWidth = video.videoWidth * scale;
-  const displayedHeight = video.videoHeight * scale;
-  const cropX = (displayedWidth - videoRect.width) / 2;
-  const cropY = (displayedHeight - videoRect.height) / 2;
-  const centerX = apertureRect.left + apertureRect.width / 2 - videoRect.left;
-  const centerY = apertureRect.top + apertureRect.height / 2 - videoRect.top;
-  const sourceDiameter = Math.max(2, apertureRect.width / scale);
-
-  return {
-    sx: (centerX + cropX) / scale - sourceDiameter / 2,
-    sy: (centerY + cropY) / scale - sourceDiameter / 2,
-    size: sourceDiameter
-  };
-}
-
-function readApertureLuminance() {
-  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA || !video.videoWidth) {
-    return null;
-  }
-
-  const source = getSourceAperture();
-  sampleContext.drawImage(
-    video,
-    source.sx,
-    source.sy,
-    source.size,
-    source.size,
-    0,
-    0,
-    SAMPLE_SIZE,
-    SAMPLE_SIZE
-  );
-
-  const pixels = sampleContext.getImageData(0, 0, SAMPLE_SIZE, SAMPLE_SIZE).data;
-  const radius = SAMPLE_SIZE * 0.44;
-  const centre = SAMPLE_SIZE / 2;
-  let sum = 0;
-  let count = 0;
-
-  for (let y = 0; y < SAMPLE_SIZE; y += 1) {
-    for (let x = 0; x < SAMPLE_SIZE; x += 1) {
-      const dx = x + 0.5 - centre;
-      const dy = y + 0.5 - centre;
-      if ((dx * dx) + (dy * dy) > radius * radius) continue;
-
-      const index = (y * SAMPLE_SIZE + x) * 4;
-      sum += (0.2126 * pixels[index]) +
-        (0.7152 * pixels[index + 1]) +
-        (0.0722 * pixels[index + 2]);
-      count += 1;
-    }
-  }
-
-  return count ? sum / count : null;
-}
-
-function normalizedLuminance(raw) {
-  const range = whitePoint - blackPoint;
-  if (range < 8) return raw / 255;
-  return Math.min(1, Math.max(0, (raw - blackPoint) / range));
-}
-
-function renderReading(raw) {
-  currentRawLuminance = raw;
-  const normalized = normalizedLuminance(raw);
-  const percent = Math.round(normalized * 100);
-  currentValue = 1 + Math.round((1 - normalized) * 9);
-  const grey = greyForValue(currentValue);
-
-  valueNumber.textContent = currentValue;
-  luminancePercent.textContent = `${percent}%`;
-  currentSwatch.style.background = `rgb(${grey} ${grey} ${grey})`;
-  currentSwatch.setAttribute("aria-label", `Value ${currentValue} swatch`);
-
-  document.querySelectorAll(".scale-step").forEach((step) => {
-    step.classList.toggle("active", Number(step.dataset.value) === currentValue);
-  });
-
-  updateMatchStatus();
-}
-
-function updateMatchStatus() {
-  if (targetValue === null || currentValue === null) {
-    matchStatus.textContent = "Set a target to compare";
-    matchStatus.className = "match-status idle";
-    return;
-  }
-
-  if (currentValue === targetValue) {
-    matchStatus.textContent = `Match · Target ${targetValue}`;
-    matchStatus.className = "match-status match";
-  } else if (currentValue < targetValue) {
-    matchStatus.textContent = `Too light · Target ${targetValue}`;
-    matchStatus.className = "match-status off";
-  } else {
-    matchStatus.textContent = `Too dark · Target ${targetValue}`;
-    matchStatus.className = "match-status off";
-  }
-}
-
-function sampleLoop(timestamp) {
-  if (!frozen && timestamp - lastUpdate > 100) {
-    const luminance = readApertureLuminance();
-    if (luminance !== null) renderReading(luminance);
-    lastUpdate = timestamp;
-  }
-  requestAnimationFrame(sampleLoop);
+function toggleCameraMode() {
+  cameraMode = cameraMode === "colour" ? "greyscale" : "colour";
+  aperture.classList.toggle("greyscale", cameraMode === "greyscale");
+  cameraModeLabel.textContent = cameraMode === "colour" ? "Colour" : "B&W";
 }
 
 function toggleFreeze() {
@@ -201,56 +197,44 @@ function toggleFreeze() {
     freezeCanvas.height = video.videoHeight;
     freezeContext.drawImage(video, 0, 0);
     freezeCanvas.classList.add("visible");
-    freezeButton.querySelector("span:last-child").textContent = "Resume";
+    freezeLabel.textContent = "Resume";
     setCameraStatus("Frame frozen");
   } else {
     freezeCanvas.classList.remove("visible");
-    freezeButton.querySelector("span:last-child").textContent = "Freeze";
+    freezeLabel.textContent = "Freeze";
     setCameraStatus("Rear camera · Live");
   }
 }
 
-function setTarget() {
-  if (currentValue === null) return;
-  targetValue = currentValue;
-  targetButton.querySelector("span:last-child").textContent = `Target ${targetValue}`;
-  updateMatchStatus();
+function updateApertureSize() {
+  document.documentElement.style.setProperty("--aperture-size", `${apertureSizeInput.value}px`);
+  updateBandLayout();
 }
 
-function calibrate(point) {
-  if (currentRawLuminance === null) return;
-
-  if (point === "white") {
-    if (currentRawLuminance <= blackPoint + 8) {
-      calibrationStatus.textContent = "White must be brighter";
-      return;
-    }
-    whitePoint = currentRawLuminance;
-  } else {
-    if (currentRawLuminance >= whitePoint - 8) {
-      calibrationStatus.textContent = "Black must be darker";
-      return;
-    }
-    blackPoint = currentRawLuminance;
+function setResponsiveSizeLimit() {
+  const maxSize = Math.min(260, window.innerWidth - 40, window.innerHeight * 0.42);
+  apertureSizeInput.max = Math.floor(maxSize);
+  if (Number(apertureSizeInput.value) > maxSize) {
+    apertureSizeInput.value = Math.floor(maxSize);
   }
-
-  calibrationStatus.textContent =
-    `Black ${Math.round(blackPoint)} · White ${Math.round(whitePoint)}`;
-  renderReading(currentRawLuminance);
+  updateApertureSize();
 }
 
+standardModeButton.addEventListener("click", () => setScaleMode("standard"));
+munsellModeButton.addEventListener("click", () => setScaleMode("munsell"));
+cameraModeButton.addEventListener("click", toggleCameraMode);
 freezeButton.addEventListener("click", toggleFreeze);
-targetButton.addEventListener("click", setTarget);
-whiteButton.addEventListener("click", () => calibrate("white"));
-blackButton.addEventListener("click", () => calibrate("black"));
-
-document.querySelector(".build-label").textContent = `Build ${BUILD}`;
-buildScale();
-startCamera();
-
+apertureSizeInput.addEventListener("input", updateApertureSize);
+window.addEventListener("resize", setResponsiveSizeLimit);
+new ResizeObserver(updateBandLayout).observe(valueField);
 window.addEventListener("beforeunload", () => {
   stream?.getTracks().forEach((track) => track.stop());
 });
+
+document.querySelector(".build-label").textContent = BUILD;
+renderScale();
+setResponsiveSizeLimit();
+startCamera();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
