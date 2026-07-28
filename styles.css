@@ -53,6 +53,14 @@ button {
   flex-direction: column;
   overflow: hidden;
   background: #111;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+  user-select: none;
+}
+
+.value-field:active {
+  cursor: grabbing;
 }
 
 .value-band {
@@ -67,6 +75,10 @@ button {
   background: var(--band-colour);
   cursor: pointer;
   transition: height 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.app-shell.dragging .value-band {
+  transition-duration: 120ms;
 }
 
 .value-band::after {
@@ -140,6 +152,10 @@ button {
     height 180ms ease,
     background-color 220ms ease;
   pointer-events: none;
+}
+
+.app-shell.dragging .comparison-field {
+  transition-duration: 100ms;
 }
 
 .comparison-field strong {

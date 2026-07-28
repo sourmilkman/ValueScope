@@ -1,4 +1,4 @@
-const BUILD = "VS-002";
+const BUILD = "VS-003";
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const valueField = document.querySelector("#valueField");
@@ -24,6 +24,16 @@ let scaleMode = "standard";
 let cameraMode = "colour";
 let stream;
 let frozen = false;
+let wheelAccumulator = 0;
+let wheelResetTimer;
+const dragState = {
+  active: false,
+  didMove: false,
+  pointerId: null,
+  startValue: selectedValue,
+  startY: 0,
+  tapValue: null
+};
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -85,7 +95,9 @@ function renderScale() {
         <strong>${scaleMode === "munsell" ? "N" : ""}${value}</strong>
       </span>
     `;
-    band.addEventListener("click", () => selectValue(value));
+    band.addEventListener("click", () => {
+      if (!dragState.didMove) selectValue(value);
+    });
     valueField.append(band);
   });
 
@@ -220,11 +232,82 @@ function setResponsiveSizeLimit() {
   updateApertureSize();
 }
 
+function clampValue(value) {
+  return Math.max(1, Math.min(10, value));
+}
+
+function beginScaleDrag(event) {
+  if (event.button !== undefined && event.button !== 0) return;
+  dragState.active = true;
+  dragState.didMove = false;
+  dragState.pointerId = event.pointerId;
+  dragState.startY = event.clientY;
+  dragState.startValue = selectedValue;
+  dragState.tapValue = event.target.closest(".value-band")?.dataset.value ?? null;
+  valueField.setPointerCapture?.(event.pointerId);
+  document.querySelector(".app-shell").classList.add("dragging");
+}
+
+function moveScaleDrag(event) {
+  if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+  const distance = dragState.startY - event.clientY;
+  if (Math.abs(distance) > 8) dragState.didMove = true;
+  if (!dragState.didMove) return;
+
+  const pixelsPerValue = Math.max(34, window.innerHeight / 18);
+  const steps = Math.round(distance / pixelsPerValue);
+  const nextValue = clampValue(dragState.startValue + steps);
+  if (nextValue !== selectedValue) {
+    selectValue(nextValue);
+    navigator.vibrate?.(6);
+  }
+}
+
+function endScaleDrag(event) {
+  if (!dragState.active || event.pointerId !== dragState.pointerId) return;
+  dragState.active = false;
+  valueField.releasePointerCapture?.(event.pointerId);
+  document.querySelector(".app-shell").classList.remove("dragging");
+  if (!dragState.didMove && dragState.tapValue) {
+    selectValue(Number(dragState.tapValue));
+  }
+  setTimeout(() => {
+    dragState.didMove = false;
+  }, 0);
+}
+
+function scrollScale(event) {
+  event.preventDefault();
+  wheelAccumulator += event.deltaY;
+  clearTimeout(wheelResetTimer);
+  wheelResetTimer = setTimeout(() => {
+    wheelAccumulator = 0;
+  }, 140);
+
+  if (Math.abs(wheelAccumulator) < 28) return;
+  const direction = Math.sign(wheelAccumulator);
+  wheelAccumulator = 0;
+  selectValue(clampValue(selectedValue + direction));
+}
+
+function handleScaleKey(event) {
+  if (!["ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const direction = event.key === "ArrowDown" ? 1 : -1;
+  selectValue(clampValue(selectedValue + direction));
+}
+
 standardModeButton.addEventListener("click", () => setScaleMode("standard"));
 munsellModeButton.addEventListener("click", () => setScaleMode("munsell"));
 cameraModeButton.addEventListener("click", toggleCameraMode);
 freezeButton.addEventListener("click", toggleFreeze);
 apertureSizeInput.addEventListener("input", updateApertureSize);
+valueField.addEventListener("pointerdown", beginScaleDrag);
+valueField.addEventListener("pointermove", moveScaleDrag);
+valueField.addEventListener("pointerup", endScaleDrag);
+valueField.addEventListener("pointercancel", endScaleDrag);
+valueField.addEventListener("wheel", scrollScale, { passive: false });
+valueField.addEventListener("keydown", handleScaleKey);
 window.addEventListener("resize", setResponsiveSizeLimit);
 new ResizeObserver(updateBandLayout).observe(valueField);
 window.addEventListener("beforeunload", () => {
