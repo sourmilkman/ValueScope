@@ -5,6 +5,7 @@
   --ui-text: #f5f5f2;
   --ui-muted: #a5a6aa;
   --aperture-size: 152px;
+  --aperture-radius: 76px;
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 }
 
@@ -45,9 +46,40 @@ button {
   isolation: isolate;
 }
 
-.value-field {
+.camera-layer {
   position: absolute;
   z-index: 0;
+  inset: 0;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 44% 40%, #34373b 0, #1b1d20 62%, #0e0f11 100%);
+}
+
+.camera-layer video,
+.camera-layer canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-layer canvas {
+  display: none;
+}
+
+.camera-layer canvas.visible {
+  display: block;
+}
+
+.camera-layer.greyscale video,
+.camera-layer.greyscale canvas {
+  filter: grayscale(1);
+}
+
+.value-field {
+  position: absolute;
+  z-index: 1;
   inset: 0;
   display: flex;
   flex-direction: column;
@@ -57,6 +89,16 @@ button {
   outline: none;
   touch-action: none;
   user-select: none;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
 }
 
 .value-field:active {
@@ -136,7 +178,7 @@ button {
 
 .comparison-field {
   position: absolute;
-  z-index: 1;
+  z-index: 2;
   top: 50%;
   left: 0;
   width: 100%;
@@ -147,6 +189,16 @@ button {
     height 180ms ease,
     background-color 220ms ease;
   pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% 50%,
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
 }
 
 .app-shell.dragging .comparison-field {
@@ -263,49 +315,8 @@ h1 {
   width: var(--aperture-size);
   max-width: calc(100vw - 40px);
   aspect-ratio: 1;
-  overflow: hidden;
-  border: 1px solid rgba(127, 127, 127, 0.5);
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 44% 40%, #34373b 0, #1b1d20 62%, #0e0f11 100%);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.15),
-    0 12px 38px rgba(0, 0, 0, 0.2);
   transition: width 180ms ease;
-}
-
-#camera,
-#freezeCanvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-#freezeCanvas {
-  display: none;
-}
-
-#freezeCanvas.visible {
-  display: block;
-}
-
-.aperture.greyscale #camera,
-.aperture.greyscale #freezeCanvas {
-  filter: grayscale(1);
-}
-
-.aperture-centre {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 6px;
-  height: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
 }
 
 .selected-badge {

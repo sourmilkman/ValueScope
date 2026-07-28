@@ -1,10 +1,11 @@
-const BUILD = "VS-004";
+const BUILD = "VS-005";
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const valueField = document.querySelector("#valueField");
 const comparisonField = document.querySelector("#comparisonField");
 const comparisonLabel = document.querySelector("#comparisonLabel");
 const aperture = document.querySelector("#aperture");
+const cameraLayer = document.querySelector("#cameraLayer");
 const video = document.querySelector("#camera");
 const freezeCanvas = document.querySelector("#freezeCanvas");
 const freezeContext = freezeCanvas.getContext("2d");
@@ -216,7 +217,7 @@ async function startCamera() {
 
 function toggleCameraMode() {
   cameraMode = cameraMode === "colour" ? "greyscale" : "colour";
-  aperture.classList.toggle("greyscale", cameraMode === "greyscale");
+  cameraLayer.classList.toggle("greyscale", cameraMode === "greyscale");
   cameraModeLabel.textContent = cameraMode === "colour" ? "Colour" : "B&W";
 }
 
@@ -240,6 +241,7 @@ function toggleFreeze() {
 
 function updateApertureSize() {
   document.documentElement.style.setProperty("--aperture-size", `${apertureSizeInput.value}px`);
+  document.documentElement.style.setProperty("--aperture-radius", `${apertureSizeInput.value / 2}px`);
   updateBandLayout();
 }
 

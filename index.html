@@ -13,6 +13,11 @@
 </head>
 <body>
   <main class="app-shell">
+    <div id="cameraLayer" class="camera-layer" aria-hidden="true">
+      <video id="camera" autoplay playsinline muted></video>
+      <canvas id="freezeCanvas"></canvas>
+    </div>
+
     <section id="valueField" class="value-field" aria-label="Selectable value scale" tabindex="0"></section>
     <div id="comparisonField" class="comparison-field" aria-hidden="true">
       <strong id="comparisonLabel">5</strong>
@@ -34,11 +39,7 @@
     </header>
 
     <section class="aperture-stage" aria-label="Camera comparison aperture">
-      <div id="aperture" class="aperture">
-        <video id="camera" autoplay playsinline muted></video>
-        <canvas id="freezeCanvas" aria-hidden="true"></canvas>
-        <span class="aperture-centre" aria-hidden="true"></span>
-      </div>
+      <div id="aperture" class="aperture"></div>
     </section>
 
     <div id="selectedBadge" class="selected-badge" aria-live="polite">
@@ -66,7 +67,7 @@
     <footer>
       <span id="scaleNote">Even digital steps</span>
       <span>Tap or slide a value</span>
-      <span class="build-label">VS-004</span>
+      <span class="build-label">VS-005</span>
     </footer>
   </main>
 
