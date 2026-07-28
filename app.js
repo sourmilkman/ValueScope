@@ -1,4 +1,4 @@
-const BUILD = "VS-003";
+const BUILD = "VS-004";
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
 const valueField = document.querySelector("#valueField");
@@ -119,24 +119,44 @@ function updateBandLayout() {
   const viewportHeight = valueField.clientHeight;
   const apertureSize = Number(apertureSizeInput.value);
   const centralHeight = Math.min(viewportHeight * 0.42, apertureSize + 44);
-  const halfRemainder = (viewportHeight - centralHeight) / 2;
+  const sideSpace = (viewportHeight - centralHeight) / 2;
   const topCount = selectedValue - 1;
   const bottomCount = 10 - selectedValue;
-  const topHeight = topCount ? halfRemainder / topCount : 0;
-  const bottomHeight = bottomCount ? halfRemainder / bottomCount : 0;
+  const longestSide = Math.max(topCount, bottomCount);
+  const minimumHeight = Math.min(24, sideSpace / Math.max(1, longestSide));
+  const decay = 0.62;
+  const distanceWeights = Array.from(
+    { length: longestSide },
+    (_, index) => decay ** index
+  );
+  const weightTotal = distanceWeights.reduce((total, weight) => total + weight, 0);
+  const distributableSpace = Math.max(0, sideSpace - (minimumHeight * longestSide));
+  const heightAtDistance = (distance) =>
+    minimumHeight +
+    (distributableSpace * (distanceWeights[distance - 1] / weightTotal));
+  const topTotal = Array.from(
+    { length: topCount },
+    (_, index) => heightAtDistance(index + 1)
+  ).reduce((total, height) => total + height, 0);
+  const bottomTotal = Array.from(
+    { length: bottomCount },
+    (_, index) => heightAtDistance(index + 1)
+  ).reduce((total, height) => total + height, 0);
+  const selectedHeight =
+    centralHeight +
+    (sideSpace - topTotal) +
+    (sideSpace - bottomTotal);
 
   bands.forEach((band) => {
     const value = Number(band.dataset.value);
     let height;
 
     if (value < selectedValue) {
-      height = topHeight;
+      height = heightAtDistance(selectedValue - value);
     } else if (value > selectedValue) {
-      height = bottomHeight;
+      height = heightAtDistance(value - selectedValue);
     } else {
-      height = centralHeight;
-      if (!topCount) height += halfRemainder;
-      if (!bottomCount) height += halfRemainder;
+      height = selectedHeight;
     }
 
     band.style.height = `${height}px`;

@@ -121,12 +121,7 @@ button {
 }
 
 .value-band.selected .value-label {
-  transform: translateY(-50%) scale(1.15);
-}
-
-.value-band.selected .value-label small {
-  max-width: 60px;
-  opacity: 0.62;
+  opacity: 0;
 }
 
 .value-band.compact .value-label {
