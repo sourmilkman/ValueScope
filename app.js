@@ -1,4 +1,4 @@
-const BUILD = "VS-006";
+const BUILD = "VS-007";
 const SAMPLE_SIZE = 96;
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
@@ -162,6 +162,7 @@ function updateBandLayout() {
 
   bands.forEach((band) => {
     const value = Number(band.dataset.value);
+    const distanceFromSelection = Math.abs(value - selectedValue);
     let height;
 
     if (value < selectedValue) {
@@ -172,6 +173,17 @@ function updateBandLayout() {
       height = selectedHeight;
     }
 
+    const previousHeight = Number.parseFloat(band.dataset.targetHeight);
+    const travel = Number.isFinite(previousHeight) ? Math.abs(height - previousHeight) : 0;
+
+    if (travel > 0.5) {
+      const duration = Math.min(420, Math.max(220, 210 + (travel * 0.72)));
+      band.dataset.motion = height > previousHeight ? "expand" : "contract";
+      band.style.setProperty("--band-motion-duration", `${Math.round(duration)}ms`);
+      band.style.setProperty("--band-motion-delay", `${Math.min(distanceFromSelection, 4) * 7}ms`);
+    }
+
+    band.dataset.targetHeight = height.toFixed(2);
     band.style.height = `${height}px`;
     band.classList.toggle("selected", value === selectedValue);
     band.classList.toggle("compact", height < 34);
