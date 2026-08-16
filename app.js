@@ -1,4 +1,4 @@
-const BUILD = "VS-010";
+const BUILD = "VS-011";
 const SAMPLE_SIZE = 96;
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 const PROFILE_KEY = "valuescope-colour-profile-v1";
@@ -60,6 +60,18 @@ const paletteSummary = document.querySelector("#paletteSummary");
 const colourMunsell = document.querySelector("#colourMunsell");
 const colourDetails = document.querySelector("#colourDetails");
 const sampleSwatch = document.querySelector("#sampleSwatch");
+const startMatchButton = document.querySelector("#startMatchButton");
+const matchCard = document.querySelector("#matchCard");
+const matchTitle = document.querySelector("#matchTitle");
+const matchInstruction = document.querySelector("#matchInstruction");
+const matchComparison = document.querySelector("#matchComparison");
+const matchGuidance = document.querySelector("#matchGuidance");
+const targetSwatch = document.querySelector("#targetSwatch");
+const mixSwatch = document.querySelector("#mixSwatch");
+const targetReading = document.querySelector("#targetReading");
+const mixReading = document.querySelector("#mixReading");
+const restartMatchButton = document.querySelector("#restartMatch");
+const exitMatchButton = document.querySelector("#exitMatch");
 const calibrationCard = document.querySelector("#calibrationCard");
 const calibrationProgress = document.querySelector("#calibrationProgress");
 const calibrationTitle = document.querySelector("#calibrationTitle");
@@ -84,6 +96,12 @@ let wheelAccumulator = 0;
 let wheelResetTimer;
 let munsellPoints = [];
 let calibrationActive = false;
+const matchFlow = {
+  active: false,
+  step: "target",
+  target: null,
+  mix: null
+};
 let colourProfile = loadColourProfile();
 const dragState = {
   active: false,
@@ -454,6 +472,7 @@ function selectValue(value, { preserveMean = false } = {}) {
 
 function setScaleMode(mode) {
   clearAutoResult();
+  clearMatchFlow();
   workspaceMode = "value";
   calibrationActive = false;
   scaleMode = mode;
@@ -478,6 +497,7 @@ function setScaleMode(mode) {
 
 function setColourMode() {
   clearAutoResult();
+  clearMatchFlow();
   workspaceMode = "colour";
   calibrationActive = false;
   appShell.classList.add("colour-mode");
@@ -604,6 +624,7 @@ function renderCalibrationStep() {
 
 function startCalibration() {
   if (!paletteIsValid()) return;
+  clearMatchFlow();
   calibrationActive = true;
   closePaletteSheet();
   colourWorkspace.classList.add("calibrating");
@@ -619,6 +640,181 @@ function stopCalibration() {
   calibrationCard.hidden = true;
   autoMatchLabel.textContent = "Sample";
   setCameraStatus(frozen ? "Frame frozen" : "Rear camera · Live");
+}
+
+function clearMatchFlow() {
+  matchFlow.active = false;
+  matchFlow.step = "target";
+  matchFlow.target = null;
+  matchFlow.mix = null;
+  matchCard.hidden = true;
+  matchComparison.hidden = true;
+  matchGuidance.hidden = true;
+  colourWorkspace.classList.remove("matching");
+  colourWorkspace.classList.remove("adjusting");
+}
+
+function startColourMatch() {
+  calibrationActive = false;
+  calibrationCard.hidden = true;
+  colourWorkspace.classList.remove("calibrating");
+  clearMatchFlow();
+  matchFlow.active = true;
+  matchCard.hidden = false;
+  colourWorkspace.classList.add("matching");
+  renderMatchFlow();
+}
+
+function exitColourMatch() {
+  clearMatchFlow();
+  autoMatchLabel.textContent = "Sample";
+  footerHint.textContent = "Select, sample, then mix";
+  setCameraStatus(frozen ? "Frame frozen" : "Rear camera · Live");
+}
+
+function restartColourMatch() {
+  matchFlow.step = "target";
+  matchFlow.target = null;
+  matchFlow.mix = null;
+  resumeLiveFrame();
+  renderMatchFlow();
+}
+
+function sampleNotation(sample) {
+  return nearestMunsell(sample.labC)?.notation || "Munsell loading";
+}
+
+function normaliseAngle(angle) {
+  return ((angle + 180) % 360 + 360) % 360 - 180;
+}
+
+function measuredPaintDirection(target, mix) {
+  const measurements = currentMeasurements();
+  const error = target.labC.map((channel, index) => channel - mix.labC[index]);
+  const errorMagnitude = Math.hypot(...error);
+  if (!errorMagnitude) return null;
+
+  return colourProfile.palette
+    .map((id) => {
+      const paint = paintById(id);
+      const measurement = measurements[`pure:${id}`];
+      if (!paint || !measurement?.labC) return null;
+      const direction = measurement.labC.map((channel, index) => channel - mix.labC[index]);
+      const magnitude = Math.hypot(...direction);
+      if (!magnitude) return null;
+      const score = direction.reduce(
+        (total, channel, index) => total + (channel * error[index]),
+        0
+      ) / (magnitude * errorMagnitude);
+      return { paint, score };
+    })
+    .filter(Boolean)
+    .sort((first, second) => second.score - first.score)[0] || null;
+}
+
+function comparisonGuidance(target, mix) {
+  const difference = deltaE76(target.labC, mix.labC);
+  if (difference < 2) {
+    return ["Very close match · rescan after any final adjustment."];
+  }
+
+  const targetValue = munsellValueForReflectance(target.luminance);
+  const mixValue = munsellValueForReflectance(mix.luminance);
+  const valueDifference = targetValue - mixValue;
+  const targetChroma = Math.hypot(target.labC[1], target.labC[2]);
+  const mixChroma = Math.hypot(mix.labC[1], mix.labC[2]);
+  const chromaDifference = targetChroma
+    ? ((mixChroma - targetChroma) / targetChroma) * 100
+    : mixChroma * 10;
+  const targetHue = Math.atan2(target.labC[2], target.labC[1]) * (180 / Math.PI);
+  const mixHue = Math.atan2(mix.labC[2], mix.labC[1]) * (180 / Math.PI);
+  const hueDifference = Math.abs(normaliseAngle(targetHue - mixHue));
+  const lines = [];
+
+  if (Math.abs(valueDifference) >= 0.15) {
+    lines.push(`Value · current mix is ${Math.abs(valueDifference).toFixed(1)} ${valueDifference > 0 ? "too dark" : "too light"}.`);
+  }
+  if (Math.abs(chromaDifference) >= 6) {
+    lines.push(`Chroma · current mix is about ${Math.round(Math.abs(chromaDifference))}% ${chromaDifference > 0 ? "too strong" : "too muted"}.`);
+  }
+  if (hueDifference >= 4) {
+    lines.push(`Hue · current mix is about ${Math.round(hueDifference)}° away from the target.`);
+  }
+
+  const measured = Object.keys(currentMeasurements()).length;
+  if (measured === 33) {
+    const direction = measuredPaintDirection(target, mix);
+    if (direction?.score > 0.15) {
+      lines.push(`Measured palette direction · add a small amount of ${direction.paint.name}, remix, then rescan.`);
+    } else {
+      lines.push("The target may be outside this limited palette’s measured gamut.");
+    }
+  } else {
+    lines.push(`Tube-addition guidance unlocks after palette calibration · ${measured}/33 swatches recorded.`);
+  }
+  return lines;
+}
+
+function renderMatchFlow() {
+  const steps = ["target", "mix", "adjust"];
+  const activeIndex = steps.indexOf(matchFlow.step);
+  colourWorkspace.classList.toggle("adjusting", matchFlow.step === "adjust");
+  document.querySelectorAll("[data-match-step]").forEach((step, index) => {
+    step.classList.toggle("active", index === activeIndex);
+    step.classList.toggle("complete", index < activeIndex);
+  });
+
+  if (matchFlow.target) {
+    targetSwatch.style.background = matchFlow.target.hex;
+    targetReading.textContent = sampleNotation(matchFlow.target);
+  }
+  if (matchFlow.mix) {
+    mixSwatch.style.background = matchFlow.mix.hex;
+    mixReading.textContent = sampleNotation(matchFlow.mix);
+  }
+
+  if (matchFlow.step === "target") {
+    matchTitle.textContent = "Save the target";
+    matchInstruction.textContent = "Aim at the reference colour, then save it through the opening.";
+    matchComparison.hidden = true;
+    matchGuidance.hidden = true;
+    autoMatchLabel.textContent = "Save target";
+    setCameraStatus("Match · Frame the target");
+  } else if (matchFlow.step === "mix") {
+    matchTitle.textContent = "Sample the current mix";
+    matchInstruction.textContent = "Now aim at the paint mixture on your palette.";
+    mixSwatch.style.background = "#555";
+    mixReading.textContent = "Pending";
+    matchComparison.hidden = false;
+    matchGuidance.hidden = true;
+    autoMatchLabel.textContent = "Sample mix";
+    setCameraStatus("Match · Frame the mixture");
+  } else {
+    matchTitle.textContent = "Adjust, mix, and rescan";
+    matchInstruction.textContent = "Use the comparison below, adjust the paint, then sample it again.";
+    matchComparison.hidden = false;
+    matchGuidance.innerHTML = comparisonGuidance(matchFlow.target, matchFlow.mix)
+      .map((line, index, lines) => `<div class="guidance-line${index === lines.length - 1 && line.includes("unlocks") ? " locked" : ""}">${line}</div>`)
+      .join("");
+    matchGuidance.hidden = false;
+    autoMatchLabel.textContent = "Rescan mix";
+    setCameraStatus("Match · Correction ready");
+  }
+
+  footerHint.textContent = "Target → mix → adjust";
+}
+
+function captureMatchSample(sample) {
+  if (matchFlow.step === "target") {
+    matchFlow.target = sample;
+    matchFlow.step = "mix";
+  } else {
+    matchFlow.mix = sample;
+    matchFlow.step = "adjust";
+  }
+  resumeLiveFrame();
+  renderMatchFlow();
+  navigator.vibrate?.(12);
 }
 
 function setCameraStatus(message, isError = false) {
@@ -814,6 +1010,11 @@ function sampleColour() {
     return;
   }
 
+  if (matchFlow.active) {
+    captureMatchSample(sample);
+    return;
+  }
+
   const measured = Object.keys(currentMeasurements()).length;
   colourDetails.textContent += measured === 33
     ? " · calibrated palette ready"
@@ -939,6 +1140,9 @@ cameraModeButton.addEventListener("click", toggleCameraMode);
 freezeButton.addEventListener("click", toggleFreeze);
 autoMatchButton.addEventListener("click", autoMatch);
 paletteButton.addEventListener("click", openPaletteSheet);
+startMatchButton.addEventListener("click", startColourMatch);
+restartMatchButton.addEventListener("click", restartColourMatch);
+exitMatchButton.addEventListener("click", exitColourMatch);
 closePaletteButton.addEventListener("click", closePaletteSheet);
 paletteSheet.querySelector("[data-close-sheet]").addEventListener("click", closePaletteSheet);
 startCalibrationButton.addEventListener("click", startCalibration);

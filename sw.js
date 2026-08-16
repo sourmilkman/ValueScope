@@ -1,4 +1,4 @@
-const CACHE_NAME = "value-scope-vs-010";
+const CACHE_NAME = "value-scope-vs-011";
 const APP_SHELL = [
   "./",
   "./index.html",

@@ -6,6 +6,7 @@
   --ui-muted: #a5a6aa;
   --aperture-size: 152px;
   --aperture-radius: 76px;
+  --colour-aperture-top: clamp(112px, 18dvh, 165px);
   font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
 }
 
@@ -53,9 +54,24 @@ button {
 }
 
 .app-shell.colour-mode .value-field {
-  background: rgba(7, 8, 8, 0.48);
+  background: #101214;
   cursor: default;
   pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    circle at 50% calc(var(--colour-aperture-top) + var(--aperture-radius)),
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
+  mask-image: radial-gradient(
+    circle at 50% calc(var(--colour-aperture-top) + var(--aperture-radius)),
+    transparent 0 var(--aperture-radius),
+    #000 calc(var(--aperture-radius) + 0.5px)
+  );
+}
+
+.app-shell.colour-mode .aperture-stage {
+  align-items: start;
+  padding-top: var(--colour-aperture-top);
 }
 
 .app-shell.colour-mode .value-band,
@@ -412,19 +428,35 @@ h1 {
   transform: translateX(-50%);
 }
 
+.app-shell.colour-mode .colour-workspace {
+  top: calc(var(--colour-aperture-top) + var(--aperture-size) + 14px);
+}
+
+.colour-workspace.adjusting .match-card > p {
+  display: none;
+}
+
 .colour-workspace[hidden],
 .calibration-card[hidden],
+.match-card[hidden],
+.match-comparison[hidden],
+.match-guidance[hidden],
 .palette-sheet[hidden] {
   display: none;
 }
 
-.colour-workspace.calibrating .colour-result {
+.colour-workspace.calibrating .colour-result,
+.colour-workspace.calibrating .match-start,
+.colour-workspace.matching .palette-button,
+.colour-workspace.matching .colour-result,
+.colour-workspace.matching .match-start {
   display: none;
 }
 
 .palette-button,
 .colour-result,
-.calibration-card {
+.calibration-card,
+.match-card {
   border: 1px solid var(--ui-line);
   background: rgba(15, 16, 18, 0.82);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
@@ -446,6 +478,139 @@ h1 {
 .palette-button strong {
   color: #fff;
   font-size: 0.64rem;
+}
+
+.match-start {
+  min-height: 42px;
+  border: 0;
+  border-radius: 14px;
+  background: #f3f3ef;
+  color: #111210;
+  font-size: 0.67rem;
+  font-weight: 820;
+}
+
+.match-card {
+  padding: 11px 12px;
+  border-radius: 17px;
+}
+
+.match-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.match-progress span {
+  padding: 5px 3px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #77797c;
+  font-size: 0.49rem;
+  font-weight: 780;
+  text-align: center;
+}
+
+.match-progress span.active {
+  background: rgba(255, 255, 255, 0.17);
+  color: #fff;
+}
+
+.match-progress span.complete {
+  color: #c9cac7;
+}
+
+.match-card > strong {
+  display: block;
+  margin-top: 9px;
+  font-size: 0.84rem;
+}
+
+.match-card > p {
+  margin: 4px 0 0;
+  color: var(--ui-muted);
+  font-size: 0.56rem;
+  line-height: 1.35;
+}
+
+.match-comparison {
+  display: grid;
+  grid-template-columns: 1fr 18px 1fr;
+  align-items: center;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.match-comparison > div {
+  display: grid;
+  grid-template-columns: 25px 1fr;
+  align-items: center;
+  column-gap: 6px;
+}
+
+.match-swatch {
+  grid-row: span 2;
+  width: 25px;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: #555;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+
+.match-comparison small {
+  color: var(--ui-muted);
+  font-size: 0.45rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.match-comparison strong {
+  overflow: hidden;
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-arrow {
+  color: #77797c;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.match-guidance {
+  display: grid;
+  gap: 4px;
+  margin-top: 9px;
+}
+
+.guidance-line {
+  padding: 5px 8px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #deded9;
+  font-size: 0.54rem;
+  line-height: 1.3;
+}
+
+.guidance-line.locked {
+  color: #aaa;
+}
+
+.match-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 7px;
+}
+
+.match-card-actions button {
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #c7c8c5;
+  font-size: 0.52rem;
+  font-weight: 720;
 }
 
 .colour-result {

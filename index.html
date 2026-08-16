@@ -64,6 +64,36 @@
         </div>
       </div>
 
+      <button id="startMatchButton" class="match-start" type="button">Match a colour</button>
+
+      <div id="matchCard" class="match-card" hidden>
+        <div class="match-progress" aria-label="Match progress">
+          <span data-match-step="target">1 · Target</span>
+          <span data-match-step="mix">2 · Mix</span>
+          <span data-match-step="adjust">3 · Adjust</span>
+        </div>
+        <strong id="matchTitle">Save the target</strong>
+        <p id="matchInstruction">Aim at the reference colour, then use the button below.</p>
+        <div id="matchComparison" class="match-comparison" hidden>
+          <div>
+            <span id="targetSwatch" class="match-swatch"></span>
+            <small>Target</small>
+            <strong id="targetReading">—</strong>
+          </div>
+          <span class="match-arrow" aria-hidden="true">→</span>
+          <div>
+            <span id="mixSwatch" class="match-swatch"></span>
+            <small>Current mix</small>
+            <strong id="mixReading">—</strong>
+          </div>
+        </div>
+        <div id="matchGuidance" class="match-guidance" hidden></div>
+        <div class="match-card-actions">
+          <button id="restartMatch" type="button">Restart</button>
+          <button id="exitMatch" type="button">Exit match</button>
+        </div>
+      </div>
+
       <div id="calibrationCard" class="calibration-card" hidden>
         <div class="calibration-heading">
           <span id="calibrationProgress">Swatch 1 of 33</span>
@@ -100,7 +130,7 @@
     <footer>
       <span id="scaleNote">Even digital steps</span>
       <span id="footerHint">Tap or slide a value</span>
-      <span class="build-label">VS-010</span>
+      <span class="build-label">VS-011</span>
     </footer>
   </main>
 
