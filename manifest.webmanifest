@@ -1,7 +1,7 @@
 {
   "name": "Value Scope",
   "short_name": "Value Scope",
-  "description": "A camera-based value comparison tool for artists.",
+  "description": "A camera-based value and colour comparison tool for artists.",
   "id": "./",
   "start_url": "./",
   "scope": "./",

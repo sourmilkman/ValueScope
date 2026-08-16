@@ -1,9 +1,10 @@
-const CACHE_NAME = "value-scope-vs-008";
+const CACHE_NAME = "value-scope-vs-009";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./data/munsell-real.dat",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./icons/icon-192.png",

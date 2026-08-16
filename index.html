@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#10100f">
-  <meta name="description" content="A camera-based value comparison tool for artists.">
+  <meta name="description" content="A camera-based value and colour comparison tool for artists.">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icons/icon-192.png">
@@ -35,6 +35,7 @@
       <div class="scale-switch" role="group" aria-label="Value scale">
         <button id="standardMode" class="active" type="button">Standard</button>
         <button id="munsellMode" type="button">Munsell N</button>
+        <button id="colourMode" type="button">Colour</button>
       </div>
     </header>
 
@@ -47,6 +48,32 @@
       <strong>5</strong>
       <span id="meanReading" class="mean-reading" hidden>Mean 5.00</span>
     </div>
+
+    <section id="colourWorkspace" class="colour-workspace" aria-live="polite" hidden>
+      <button id="paletteButton" class="palette-button" type="button">
+        <span>Artists’ Oil palette</span>
+        <strong id="paletteSummary">5 tubes</strong>
+      </button>
+
+      <div id="colourResult" class="colour-result">
+        <span id="sampleSwatch" class="sample-swatch" aria-hidden="true"></span>
+        <div>
+          <small>Camera estimate</small>
+          <strong id="colourMunsell">Aim through the opening</strong>
+          <span id="colourDetails">Tap Sample to match a colour</span>
+        </div>
+      </div>
+
+      <div id="calibrationCard" class="calibration-card" hidden>
+        <div class="calibration-heading">
+          <span id="calibrationProgress">Swatch 1 of 33</span>
+          <button id="stopCalibration" type="button">Finish later</button>
+        </div>
+        <strong id="calibrationTitle">Prepare the first swatch</strong>
+        <div id="calibrationRecipe" class="calibration-recipe"></div>
+        <small>Opaque, evenly lit, and filling the opening</small>
+      </div>
+    </section>
 
     <section class="control-dock" aria-label="Camera controls">
       <button id="cameraModeButton" class="dock-button" type="button">
@@ -66,16 +93,41 @@
 
       <button id="autoMatchButton" class="dock-button auto-match" type="button">
         <span class="button-icon auto-icon" aria-hidden="true"></span>
-        <span>Auto match</span>
+        <span id="autoMatchLabel">Auto match</span>
       </button>
     </section>
 
     <footer>
       <span id="scaleNote">Even digital steps</span>
-      <span>Tap or slide a value</span>
-      <span class="build-label">VS-008</span>
+      <span id="footerHint">Tap or slide a value</span>
+      <span class="build-label">VS-009</span>
     </footer>
   </main>
+
+  <section id="paletteSheet" class="palette-sheet" role="dialog" aria-modal="true" aria-labelledby="paletteTitle" hidden>
+    <div class="sheet-backdrop" data-close-sheet></div>
+    <div class="sheet-panel">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <header>
+        <div>
+          <small>Winsor &amp; Newton</small>
+          <h2 id="paletteTitle">Artists’ Oil palette</h2>
+        </div>
+        <button id="closePalette" class="sheet-close" type="button" aria-label="Close palette">Done</button>
+      </header>
+      <p>Select four colours plus one white. ValueScope stores each palette’s calibration on this device.</p>
+      <div id="paintList" class="paint-list"></div>
+      <div class="sheet-progress">
+        <div>
+          <span>Calibration</span>
+          <strong id="sheetProgressLabel">0 / 33</strong>
+        </div>
+        <progress id="sheetProgress" max="33" value="0"></progress>
+      </div>
+      <button id="startCalibration" class="primary-action" type="button">Start 33-swatch calibration</button>
+      <small id="paletteMessage" class="palette-message">Measurements are saved automatically.</small>
+    </div>
+  </section>
 
   <canvas id="sampleCanvas" width="96" height="96" hidden></canvas>
   <script src="./app.js" defer></script>
