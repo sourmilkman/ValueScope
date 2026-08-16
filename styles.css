@@ -118,23 +118,23 @@ button {
   cursor: pointer;
   transition:
     height
-    var(--band-motion-duration, 340ms)
-    var(--band-motion-ease, cubic-bezier(0.4, 0, 0.2, 1))
+    var(--band-motion-duration, 760ms)
+    var(--band-motion-ease, cubic-bezier(0.65, 0, 0.35, 1))
     var(--band-motion-delay, 0ms);
 }
 
 .value-band[data-motion="expand"] {
-  --band-motion-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --band-motion-ease: cubic-bezier(0.62, 0, 0.3, 1);
 }
 
 .value-band[data-motion="contract"] {
-  --band-motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --band-motion-ease: cubic-bezier(0.7, 0, 0.35, 1);
 }
 
 .app-shell.dragging .value-band {
-  transition-duration: 135ms;
+  transition-duration: 280ms;
   transition-delay: 0ms;
-  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition-timing-function: cubic-bezier(0.45, 0, 0.2, 1);
 }
 
 .value-band::after {

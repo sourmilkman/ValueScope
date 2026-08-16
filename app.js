@@ -1,4 +1,4 @@
-const BUILD = "VS-007";
+const BUILD = "VS-008";
 const SAMPLE_SIZE = 96;
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 
@@ -177,10 +177,10 @@ function updateBandLayout() {
     const travel = Number.isFinite(previousHeight) ? Math.abs(height - previousHeight) : 0;
 
     if (travel > 0.5) {
-      const duration = Math.min(420, Math.max(220, 210 + (travel * 0.72)));
+      const duration = Math.min(1100, Math.max(600, 560 + (travel * 1.9)));
       band.dataset.motion = height > previousHeight ? "expand" : "contract";
       band.style.setProperty("--band-motion-duration", `${Math.round(duration)}ms`);
-      band.style.setProperty("--band-motion-delay", `${Math.min(distanceFromSelection, 4) * 7}ms`);
+      band.style.setProperty("--band-motion-delay", `${Math.min(distanceFromSelection, 4) * 12}ms`);
     }
 
     band.dataset.targetHeight = height.toFixed(2);
