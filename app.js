@@ -1,4 +1,4 @@
-const BUILD = "VS-009";
+const BUILD = "VS-010";
 const SAMPLE_SIZE = 96;
 const VALUES = Array.from({ length: 10 }, (_, index) => index + 1);
 const PROFILE_KEY = "valuescope-colour-profile-v1";
@@ -856,7 +856,7 @@ function updateApertureSize() {
 }
 
 function setResponsiveSizeLimit() {
-  const maxSize = Math.min(260, window.innerWidth - 40, window.innerHeight * 0.42);
+  const maxSize = Math.min(200, window.innerWidth - 40, window.innerHeight * 0.42);
   apertureSizeInput.max = Math.floor(maxSize);
   if (Number(apertureSizeInput.value) > maxSize) {
     apertureSizeInput.value = Math.floor(maxSize);
